@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Nostr Like Injector",
+  "version": "0.2.0",
+  "description": "Injects a Nostr-style button on X/Twitter and writes events to Firebase Firestore.",
+  "host_permissions": [
+    "https://x.com/*",
+    "https://firestore.googleapis.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://x.com/*"
+      ],
+      "js": [
+        "firebase-config.js",
+        "firebase-client.js",
+        "pubkey-scraper.js",
+        "content.js"
+      ],
+      "css": [
+        "style.css"
+      ],
+      "run_at": "document_end"
+    }
+  ]
+}
