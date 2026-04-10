@@ -6,6 +6,29 @@
   flex: 0 0 auto;
 }
 
+.nostr-like-profile-inline-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.nostr-like-profile-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, rgba(255, 153, 0, 0.2), rgba(255, 196, 0, 0.14));
+  border: 1px solid rgba(255, 183, 0, 0.4);
+  color: rgb(255, 198, 67);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .nostr-like-inner {
   display: inline-flex;
   align-items: center;

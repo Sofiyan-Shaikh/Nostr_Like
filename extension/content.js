@@ -1,9 +1,27 @@
 const HOST_ATTR = "data-nostr-like-host";
+const PROFILE_HOST_ATTR = "data-nostr-like-profile-host";
+const PROFILE_INLINE_HOST_ATTR = "data-nostr-like-profile-inline-host";
 const ACTION_CONTAINER_CLASS = "nostr-like-action-container";
 const ACTION_BAR_SELECTOR = 'div[role="group"], div[role="toolbar"]';
+const PROFILE_ACTIONS_SELECTOR = 'div[data-testid="userActions"]';
+const PRIMARY_COLUMN_SELECTOR = 'div[data-testid="primaryColumn"]';
+const PROFILE_HEADER_ANCHOR_SELECTORS = [
+  '[data-testid="UserName"]',
+  '[data-testid="UserDescription"]',
+  '[data-testid="UserProfileHeader_Items"]'
+];
 const ACTION_BUTTON_SELECTOR =
   '[data-testid="reply"], [data-testid="retweet"], [data-testid="unretweet"], [data-testid="like"], [data-testid="unlike"]';
-const PROFILE_TAB_SEGMENTS = new Set(["with_replies", "media", "likes", "highlights", "articles"]);
+const PROFILE_TAB_SEGMENTS = new Set([
+  "with_replies",
+  "media",
+  "likes",
+  "highlights",
+  "articles",
+  "followers",
+  "following",
+  "verified_followers"
+]);
 const RESERVED_PROFILE_PATHS = new Set([
   "home",
   "explore",
@@ -137,6 +155,11 @@ function buildTweetStateKey(context) {
   if (context && context.tweet_id) return `tweet:${context.tweet_id}`;
   if (context && context.tweet_url) return `url:${context.tweet_url}`;
   return `page:${window.location.href}`;
+}
+
+function buildProfileStateKey(handle) {
+  const normalized = normalizeHandle(handle);
+  return normalized ? `profile:${normalized}` : `profile:${window.location.pathname}`;
 }
 
 function buildButton() {
@@ -387,6 +410,16 @@ function shouldInjectIntoActionBar(actionBar) {
   return isRememberedRelevantHandle(authorHandle);
 }
 
+function shouldInjectIntoProfile() {
+  const route = getCurrentProfileRoute();
+  if (!route) return false;
+  const profileSignals = readCurrentProfileSignals();
+  if (isRelevantProfileSignals(profileSignals)) {
+    return true;
+  }
+  return isRememberedRelevantHandle(route.handle);
+}
+
 function syncNostrButtonState(actionBar, button, context) {
   if (!button) return;
   const stateKey = buildTweetStateKey(context || extractTweetContext(actionBar));
@@ -403,6 +436,53 @@ function syncNostrButtonState(actionBar, button, context) {
 
 function findNostrButton(actionBar) {
   return actionBar.querySelector(`[${HOST_ATTR}="true"] .nostr-like-button`);
+}
+
+function findProfileNostrButton(profileActions) {
+  return profileActions.querySelector(`[${PROFILE_HOST_ATTR}="true"] .nostr-like-button`);
+}
+
+function findInlineProfileNostrButton() {
+  return document.querySelector(`[${PROFILE_INLINE_HOST_ATTR}="true"] .nostr-like-button`);
+}
+
+function isInsideTweet(node) {
+  return Boolean(node && typeof node.closest === "function" && node.closest("article"));
+}
+
+function getPrimaryColumn() {
+  return document.querySelector(PRIMARY_COLUMN_SELECTOR);
+}
+
+function findProfileInlineAnchor() {
+  const primaryColumn = getPrimaryColumn();
+  const searchRoot = primaryColumn || document;
+
+  for (const selector of PROFILE_HEADER_ANCHOR_SELECTORS) {
+    const candidates = Array.from(searchRoot.querySelectorAll(selector)).filter((node) => {
+      if (isInsideTweet(node)) return false;
+      if (primaryColumn && !primaryColumn.contains(node)) return false;
+      return true;
+    });
+
+    if (candidates.length > 0) {
+      return candidates[0];
+    }
+  }
+
+  return null;
+}
+
+function getProfileIndicatorText(route, profileSignals) {
+  const tag = profileSignals && typeof profileSignals.relevance_tag === "string"
+    ? profileSignals.relevance_tag
+    : "";
+
+  if (tag === "bitcoin+nostr") return "Bitcoin + Nostr";
+  if (tag === "nostr") return "Nostr User";
+  if (tag === "bitcoin") return "Bitcoin User";
+  if (route && isRememberedRelevantHandle(route.handle)) return "Known Nostr User";
+  return "Relevant Profile";
 }
 
 function scheduleStateSync(actionBar) {
@@ -515,6 +595,138 @@ async function handleNostrLikeClick(button, actionBar) {
   }
 }
 
+function syncProfileNostrButtonState(button, route) {
+  if (!button) return;
+  const stateKey = buildProfileStateKey(route && route.handle);
+  button.dataset.tweetKey = stateKey;
+  const documentName = savedTweetDocs[stateKey];
+
+  if (button.dataset.saved === "true" || savedTweetKeys.has(stateKey)) {
+    setSavedButtonState(button, documentName, "Saved profile to Firestore");
+    return;
+  }
+
+  button.disabled = false;
+  delete button.dataset.saved;
+  delete button.dataset.documentName;
+  setButtonState(button, "idle", "Nostr Profile", "Save this profile to Firebase");
+}
+
+async function handleProfileNostrLikeClick(button) {
+  if (button.disabled) return;
+
+  const route = getCurrentProfileRoute();
+  if (!route) {
+    setButtonState(button, "error", "No Profile", "Open a profile page to save profile data");
+    setTimeout(() => syncProfileNostrButtonState(button, route), 2200);
+    return;
+  }
+
+  const stateKey = buildProfileStateKey(route.handle);
+  button.dataset.tweetKey = stateKey;
+  const documentName = savedTweetDocs[stateKey] || button.dataset.documentName || "";
+
+  if (savedTweetKeys.has(stateKey) || button.dataset.saved === "true") {
+    if (!window.nostrFirebase || typeof window.nostrFirebase.deleteLikeEvent !== "function") {
+      setButtonState(button, "error", "No Client", "firebase-client.js delete method was not loaded");
+      setTimeout(() => syncProfileNostrButtonState(button, route), 2200);
+      return;
+    }
+
+    if (!window.nostrFirebase.isConfigured()) {
+      setButtonState(button, "error", "Configure", "Update extension/firebase-config.js and set enabled: true");
+      setTimeout(() => syncProfileNostrButtonState(button, route), 2200);
+      return;
+    }
+
+    if (!documentName) {
+      setButtonState(button, "error", "No Doc", "No saved Firestore document was found for this profile");
+      setTimeout(() => syncProfileNostrButtonState(button, route), 2200);
+      return;
+    }
+
+    button.disabled = true;
+    setButtonState(button, "loading", "Unsaving...", "Removing saved profile from Firestore");
+
+    try {
+      await window.nostrFirebase.deleteLikeEvent(documentName);
+      savedTweetKeys.delete(stateKey);
+      delete savedTweetDocs[stateKey];
+      persistSavedTweetKeys();
+      persistSavedTweetDocs();
+      syncProfileNostrButtonState(button, route);
+    } catch (error) {
+      console.error("Nostr profile unsave failed", error);
+      const message = error instanceof Error ? error.message : "Firestore delete failed";
+      button.disabled = false;
+      setButtonState(button, "error", "Retry", message);
+      setTimeout(() => syncProfileNostrButtonState(button, route), 2200);
+    }
+
+    return;
+  }
+
+  if (!window.nostrFirebase || typeof window.nostrFirebase.saveLikeEvent !== "function") {
+    setButtonState(button, "error", "No Client", "firebase-client.js was not loaded");
+    setTimeout(() => syncProfileNostrButtonState(button, route), 1800);
+    return;
+  }
+
+  if (!window.nostrFirebase.isConfigured()) {
+    setButtonState(button, "error", "Configure", "Update extension/firebase-config.js and set enabled: true");
+    setTimeout(() => syncProfileNostrButtonState(button, route), 2200);
+    return;
+  }
+
+  const profileSignals = readCurrentProfileSignals();
+  if (isRelevantProfileSignals(profileSignals)) {
+    rememberRelevantHandle(route.handle, profileSignals.relevance_tag || "");
+  }
+
+  const payload = {
+    entity_type: "profile",
+    profile_handle: route.handle || "",
+    profile_url: window.location.href,
+    page_title: document.title,
+    profile_relevance_tag: profileSignals && profileSignals.relevance_tag ? profileSignals.relevance_tag : "",
+    profile_identifier_type: profileSignals && profileSignals.identifier_type ? profileSignals.identifier_type : "",
+    profile_identifier_value: profileSignals && profileSignals.identifier_value ? profileSignals.identifier_value : "",
+    profile_npub:
+      profileSignals && profileSignals.npub && profileSignals.npub !== "(not found)"
+        ? profileSignals.npub
+        : "",
+    profile_pubkey_hex:
+      profileSignals && profileSignals.pubkey_hex && profileSignals.pubkey_hex !== "(not resolved)"
+        ? profileSignals.pubkey_hex
+        : ""
+  };
+
+  button.disabled = true;
+  setButtonState(button, "loading", "Saving...", "Writing profile event to Firestore");
+
+  try {
+    const result = await window.nostrFirebase.saveLikeEvent(payload);
+    savedTweetKeys.add(stateKey);
+    if (result && result.name) {
+      savedTweetDocs[stateKey] = result.name;
+      button.dataset.documentName = result.name;
+    }
+    persistSavedTweetKeys();
+    persistSavedTweetDocs();
+    setSavedButtonState(
+      button,
+      result && result.name ? result.name : "",
+      result && result.name ? result.name : "Saved profile to Firestore"
+    );
+  } catch (error) {
+    console.error("Nostr profile save failed", error);
+    const message = error instanceof Error ? error.message : "Firestore write failed";
+    button.disabled = false;
+    setButtonState(button, "error", "Retry", message);
+    setTimeout(() => syncProfileNostrButtonState(button, route), 2200);
+  }
+}
+
 function buildActionHost(actionBar) {
   // Mirror X action-slot sizing so layout remains stable.
   const wrapper = document.createElement("div");
@@ -538,9 +750,68 @@ function buildActionHost(actionBar) {
   return wrapper;
 }
 
+function buildProfileActionHost(profileActions) {
+  const wrapper = document.createElement("div");
+  wrapper.className = ACTION_CONTAINER_CLASS;
+  wrapper.setAttribute(PROFILE_HOST_ATTR, "true");
+
+  const inner = document.createElement("div");
+  inner.className = "nostr-like-inner";
+
+  const button = buildButton();
+  attachButtonIsolation(button);
+  const route = getCurrentProfileRoute();
+  syncProfileNostrButtonState(button, route);
+  button.addEventListener(
+    "click",
+    (event) => {
+      isolateClickEvent(event);
+      handleProfileNostrLikeClick(button);
+    },
+    true
+  );
+
+  inner.appendChild(button);
+  wrapper.appendChild(inner);
+  return wrapper;
+}
+
+function buildInlineProfileHost() {
+  const wrapper = document.createElement("div");
+  wrapper.className = "nostr-like-profile-inline-container";
+  wrapper.setAttribute(PROFILE_INLINE_HOST_ATTR, "true");
+
+  const route = getCurrentProfileRoute();
+  const profileSignals = readCurrentProfileSignals();
+
+  const badge = document.createElement("div");
+  badge.className = "nostr-like-profile-badge";
+  badge.textContent = getProfileIndicatorText(route, profileSignals);
+
+  const button = buildButton();
+  attachButtonIsolation(button);
+  syncProfileNostrButtonState(button, route);
+  button.addEventListener(
+    "click",
+    (event) => {
+      isolateClickEvent(event);
+      handleProfileNostrLikeClick(button);
+    },
+    true
+  );
+
+  wrapper.appendChild(badge);
+  wrapper.appendChild(button);
+  return wrapper;
+}
+
 function removeInjectedButtons() {
   const hosts = document.querySelectorAll(`[${HOST_ATTR}="true"]`);
   hosts.forEach((host) => host.remove());
+  const profileHosts = document.querySelectorAll(`[${PROFILE_HOST_ATTR}="true"]`);
+  profileHosts.forEach((host) => host.remove());
+  const inlineProfileHosts = document.querySelectorAll(`[${PROFILE_INLINE_HOST_ATTR}="true"]`);
+  inlineProfileHosts.forEach((host) => host.remove());
 }
 
 function injectIntoActionBar(actionBar) {
@@ -576,6 +847,56 @@ function injectIntoActionBar(actionBar) {
   scheduleStateSync(actionBar);
 }
 
+function injectIntoProfileActions(profileActions) {
+  if (!profileActions) return;
+  const existingHost = profileActions.querySelector(`[${PROFILE_HOST_ATTR}="true"]`);
+
+  if (!shouldInjectIntoProfile()) {
+    if (existingHost) existingHost.remove();
+    return;
+  }
+
+  if (existingHost) {
+    const existingButton = findProfileNostrButton(profileActions);
+    const route = getCurrentProfileRoute();
+    syncProfileNostrButtonState(existingButton, route);
+    return;
+  }
+
+  const host = buildProfileActionHost(profileActions);
+  profileActions.appendChild(host);
+}
+
+function injectInlineProfileButton() {
+  const existingHost = document.querySelector(`[${PROFILE_INLINE_HOST_ATTR}="true"]`);
+
+  if (!shouldInjectIntoProfile()) {
+    if (existingHost) existingHost.remove();
+    return;
+  }
+
+  const anchor = findProfileInlineAnchor();
+  if (!anchor || !anchor.parentElement) return;
+
+  if (existingHost) {
+    if (existingHost.parentElement !== anchor.parentElement || existingHost.previousElementSibling !== anchor) {
+      anchor.parentElement.insertBefore(existingHost, anchor.nextSibling);
+    }
+    const route = getCurrentProfileRoute();
+    const profileSignals = readCurrentProfileSignals();
+    const badge = existingHost.querySelector(".nostr-like-profile-badge");
+    if (badge) {
+      badge.textContent = getProfileIndicatorText(route, profileSignals);
+    }
+    const existingButton = findInlineProfileNostrButton();
+    syncProfileNostrButtonState(existingButton, route);
+    return;
+  }
+
+  const host = buildInlineProfileHost();
+  anchor.parentElement.insertBefore(host, anchor.nextSibling);
+}
+
 function processRoot(root) {
   if (!isSupportedPage()) return;
   if (!root || root.nodeType !== Node.ELEMENT_NODE) return;
@@ -589,6 +910,17 @@ function processRoot(root) {
     ? element.querySelectorAll(ACTION_BAR_SELECTOR)
     : [];
   actionBars.forEach(injectIntoActionBar);
+
+  if (element.matches && element.matches(PROFILE_ACTIONS_SELECTOR)) {
+    injectIntoProfileActions(element);
+  }
+
+  const profileActionBars = element.querySelectorAll
+    ? element.querySelectorAll(PROFILE_ACTIONS_SELECTOR)
+    : [];
+  profileActionBars.forEach(injectIntoProfileActions);
+
+  injectInlineProfileButton();
 }
 
 function runInitialScan() {
