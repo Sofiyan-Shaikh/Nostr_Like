@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Nostr Like</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- Main view -->
+    <div id="main-view">
+      <div class="header">
+        <span class="logo">⚡</span>
+        <h1>Nostr Like</h1>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="likes">Likes</button>
+        <button class="tab-btn" data-tab="profiles">Profiles</button>
+      </div>
+
+      <div class="panel" id="likes-panel">
+        <div class="status" id="likes-loading">Loading…</div>
+        <div class="list" id="likes-list"></div>
+        <div class="status hidden" id="likes-empty">No likes saved yet.</div>
+        <div class="status error hidden" id="likes-error"></div>
+      </div>
+
+      <div class="panel hidden" id="profiles-panel">
+        <div class="status" id="profiles-loading">Loading…</div>
+        <div class="list" id="profiles-list"></div>
+        <div class="status hidden" id="profiles-empty">No profiles scraped yet.</div>
+        <div class="status error hidden" id="profiles-error"></div>
+      </div>
+    </div>
+
+    <!-- Detail view (hidden by default) -->
+    <div id="detail-view" class="hidden">
+      <div class="detail-header">
+        <button id="back-btn" class="back-btn">&#8592; Back</button>
+        <div id="detail-title" class="detail-title"></div>
+      </div>
+      <div id="detail-body" class="detail-body"></div>
+    </div>
+
+  </div>
+
+  <script src="firebase-config.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

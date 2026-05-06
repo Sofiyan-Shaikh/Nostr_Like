@@ -1,27 +1,36 @@
 {
   "manifest_version": 3,
   "name": "Nostr Like Injector",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Injects a Nostr-style button on X/Twitter and writes events to Firebase Firestore.",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Nostr Like History"
+  },
   "host_permissions": [
     "https://x.com/*",
     "https://firestore.googleapis.com/*"
   ],
   "content_scripts": [
     {
-      "matches": [
-        "https://x.com/*"
-      ],
+      "matches": ["https://x.com/*"],
+      "js": ["firebase-relay.js"],
+      "run_at": "document_end"
+    },
+    {
+      "matches": ["https://x.com/*"],
       "js": [
         "firebase-config.js",
-        "firebase-client.js",
+        "firebase-bridge.js",
         "pubkey-scraper.js",
         "content.js"
       ],
-      "css": [
-        "style.css"
-      ],
-      "run_at": "document_end"
+      "css": ["style.css"],
+      "run_at": "document_end",
+      "world": "MAIN"
     }
   ]
 }

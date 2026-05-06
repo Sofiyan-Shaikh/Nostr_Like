@@ -1,0 +1,449 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 360px;
+  min-height: 200px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  background: #000;
+  color: #e7e9ea;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid #2f3336;
+}
+
+.logo {
+  font-size: 20px;
+  line-height: 1;
+}
+
+h1 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #e7e9ea;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid #2f3336;
+}
+
+.tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #71767b;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 0;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab-btn:hover {
+  color: #e7e9ea;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tab-btn.active {
+  color: #e7e9ea;
+  border-bottom-color: rgb(29, 155, 240);
+}
+
+/* Panels */
+.panel {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Status messages */
+.status {
+  padding: 20px 16px;
+  color: #71767b;
+  text-align: center;
+  font-size: 13px;
+}
+
+.status.error {
+  color: rgb(244, 33, 46);
+}
+
+/* Cards */
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.card {
+  padding: 12px 16px;
+  border-bottom: 1px solid #2f3336;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card:last-child {
+  border-bottom: none;
+}
+
+.card:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.card-handle {
+  font-weight: 700;
+  font-size: 13px;
+  color: #e7e9ea;
+}
+
+.card-name {
+  font-weight: 400;
+  color: #71767b;
+  font-size: 12px;
+}
+
+.card-link {
+  color: rgb(29, 155, 240);
+  text-decoration: none;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.card-link:hover {
+  text-decoration: underline;
+}
+
+.card-identifier {
+  font-size: 12px;
+  color: #71767b;
+}
+
+.card-identifier code {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 11px;
+  color: #e7e9ea;
+  background: #16181c;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 9999px;
+}
+
+.tag-btc {
+  background: rgba(247, 147, 26, 0.15);
+  color: rgb(247, 147, 26);
+}
+
+.tag-nostr {
+  background: rgba(139, 92, 246, 0.15);
+  color: rgb(167, 139, 250);
+}
+
+.confidence {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 9999px;
+}
+
+.conf-high {
+  background: rgba(0, 186, 124, 0.15);
+  color: rgb(0, 186, 124);
+}
+
+.conf-medium {
+  background: rgba(29, 155, 240, 0.15);
+  color: rgb(29, 155, 240);
+}
+
+.conf-low {
+  background: rgba(113, 118, 123, 0.15);
+  color: rgb(113, 118, 123);
+}
+
+.card-date {
+  font-size: 11px;
+  color: #71767b;
+}
+
+/* Clickable card */
+.card--clickable {
+  cursor: pointer;
+  position: relative;
+  padding-right: 28px;
+}
+
+.card--clickable:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.card-arrow {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #71767b;
+  font-size: 16px;
+}
+
+/* ── Detail view ─────────────────────────────────────────────────────────── */
+
+#detail-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #2f3336;
+  min-height: 44px;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: rgb(29, 155, 240);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.back-btn:hover {
+  background: rgba(29, 155, 240, 0.1);
+}
+
+.detail-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e7e9ea;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-body {
+  overflow-y: auto;
+  max-height: 420px;
+  padding-bottom: 8px;
+}
+
+.detail-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #71767b;
+  padding: 10px 14px 4px;
+  border-top: 1px solid #2f3336;
+  margin-top: 4px;
+}
+
+.detail-section-title:first-child {
+  border-top: none;
+  margin-top: 0;
+}
+
+.detail-row {
+  display: flex;
+  gap: 8px;
+  padding: 5px 14px;
+  align-items: flex-start;
+}
+
+.detail-row--bio {
+  align-items: flex-start;
+}
+
+.detail-label {
+  font-size: 11px;
+  color: #71767b;
+  width: 96px;
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+
+.detail-value {
+  font-size: 12px;
+  color: #e7e9ea;
+  flex: 1;
+  word-break: break-all;
+  line-height: 1.45;
+}
+
+.detail-value--badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.detail-value--copy {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-bio {
+  color: #e7e9ea;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.detail-link {
+  color: rgb(29, 155, 240);
+  text-decoration: none;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.detail-link:hover {
+  text-decoration: underline;
+}
+
+code {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 11px;
+  color: #e7e9ea;
+  background: #16181c;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.code-full {
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.copy-btn {
+  background: none;
+  border: 1px solid #2f3336;
+  color: #71767b;
+  font-size: 12px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.copy-btn:hover {
+  color: rgb(29, 155, 240);
+  border-color: rgb(29, 155, 240);
+}
+
+/* Source evidence */
+.ev-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 14px 8px;
+}
+
+.ev-item {
+  background: #16181c;
+  border-radius: 6px;
+  padding: 7px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ev-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #71767b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ev-text {
+  font-size: 12px;
+  color: #e7e9ea;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.ev-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.kw {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 9999px;
+}
+
+.kw-nostr {
+  background: rgba(139, 92, 246, 0.2);
+  color: rgb(167, 139, 250);
+}
+
+.kw-btc {
+  background: rgba(247, 147, 26, 0.2);
+  color: rgb(247, 147, 26);
+}
+
+/* Not configured */
+.not-configured {
+  padding: 24px 16px;
+  text-align: center;
+  color: #71767b;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+.not-configured code {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 11px;
+  background: #16181c;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #e7e9ea;
+}

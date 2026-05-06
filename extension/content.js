@@ -27,6 +27,7 @@ const RESERVED_PROFILE_PATHS = new Set([
 const SAVED_TWEETS_STORAGE_KEY = "nostr_like_saved_tweets_v1";
 const SAVED_TWEET_DOCS_STORAGE_KEY = "nostr_like_saved_docs_v1";
 const RELEVANT_HANDLES_STORAGE_KEY = "nostr_like_relevant_handles_v1";
+const SCRAPED_HANDLES_STORAGE_KEY = "nostr_like_scraped_handles_v1";
 const savedTweetKeys = loadSavedTweetKeys();
 const savedTweetDocs = loadSavedTweetDocs();
 const relevantHandles = loadRelevantHandles();
@@ -108,6 +109,23 @@ function persistRelevantHandles() {
   } catch (error) {
     // Ignore localStorage failures (privacy mode/storage limits).
   }
+}
+
+function loadScrapedHandles() {
+  try {
+    const raw = window.localStorage.getItem(SCRAPED_HANDLES_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistScrapedHandles(set) {
+  try {
+    window.localStorage.setItem(SCRAPED_HANDLES_STORAGE_KEY, JSON.stringify([...set]));
+  } catch {}
 }
 
 function normalizeHandle(handle) {
@@ -411,6 +429,80 @@ function scheduleStateSync(actionBar) {
   requestAnimationFrame(() => syncNostrButtonState(actionBar, button));
 }
 
+function extractAuthorDisplayName(actionBar) {
+  const article = actionBar.closest("article");
+  if (!article) return "";
+  const nameEl = article.querySelector(
+    '[data-testid="User-Name"] span[class], [data-testid="UserName"] span'
+  );
+  return nameEl ? (nameEl.innerText || nameEl.textContent || "").trim() : "";
+}
+
+async function autoSaveProfileFromLike(context, actionBar) {
+  if (!window.nostrFirebase || !window.nostrFirebase.isConfigured()) return;
+  if (!context || !context.author_handle) return;
+
+  const handle = normalizeHandle(context.author_handle);
+  if (!handle) return;
+
+  const scraped = loadScrapedHandles();
+  if (scraped.has(handle)) return;
+
+  let profilePayload;
+
+  if (typeof window.analyzeProfilePubkeySignals === "function") {
+    try {
+      const signals = window.analyzeProfilePubkeySignals({ includeTimeline: false });
+      const hasRealHandle =
+        signals &&
+        signals.handle &&
+        signals.handle !== "(unknown)" &&
+        normalizeHandle(signals.handle) === handle;
+
+      if (hasRealHandle) {
+        profilePayload = {
+          handle: signals.handle,
+          display_name: signals.display_name || "",
+          npub: signals.npub || "(not found)",
+          pubkey_hex: signals.pubkey_hex || "(not resolved)",
+          identifier_type: signals.identifier_type || "none",
+          identifier_value: signals.identifier_value || "(not found)",
+          relevance_tag: signals.relevance_tag || "unknown",
+          confidence: signals.confidence || "none",
+          keep_profile: Boolean(signals.keep_profile),
+          source: "like_auto_scrape",
+          linked_tweet_url: context.tweet_url || "",
+          linked_tweet_id: context.tweet_id || ""
+        };
+      }
+    } catch {}
+  }
+
+  if (!profilePayload) {
+    const displayName = extractAuthorDisplayName(actionBar);
+    profilePayload = {
+      handle: context.author_handle,
+      display_name: displayName,
+      npub: "(not found)",
+      pubkey_hex: "(not resolved)",
+      identifier_type: "none",
+      identifier_value: "(not found)",
+      relevance_tag: "unknown",
+      confidence: "none",
+      keep_profile: false,
+      source: "like_auto_scrape",
+      linked_tweet_url: context.tweet_url || "",
+      linked_tweet_id: context.tweet_id || ""
+    };
+  }
+
+  try {
+    await window.nostrFirebase.saveProfileScrape(profilePayload);
+    scraped.add(handle);
+    persistScrapedHandles(scraped);
+  } catch {}
+}
+
 async function handleNostrLikeClick(button, actionBar) {
   if (button.disabled) return;
 
@@ -421,7 +513,7 @@ async function handleNostrLikeClick(button, actionBar) {
 
   if (savedTweetKeys.has(stateKey) || button.dataset.saved === "true") {
     if (!window.nostrFirebase || typeof window.nostrFirebase.deleteLikeEvent !== "function") {
-      setButtonState(button, "error", "No Client", "firebase-client.js delete method was not loaded");
+      setButtonState(button, "error", "No Client", "Firebase bridge was not loaded");
       setTimeout(() => syncNostrButtonState(actionBar, button, context), 2200);
       return;
     }
@@ -460,7 +552,7 @@ async function handleNostrLikeClick(button, actionBar) {
   }
 
   if (!window.nostrFirebase || typeof window.nostrFirebase.saveLikeEvent !== "function") {
-    setButtonState(button, "error", "No Client", "firebase-client.js was not loaded");
+    setButtonState(button, "error", "No Client", "Firebase bridge was not loaded");
     setTimeout(() => resetButtonState(button), 1800);
     return;
   }
@@ -506,6 +598,7 @@ async function handleNostrLikeClick(button, actionBar) {
       result && result.name ? result.name : "",
       result && result.name ? result.name : "Saved to Firestore"
     );
+    autoSaveProfileFromLike(context, actionBar);
   } catch (error) {
     console.error("Nostr Like save failed", error);
     const message = error instanceof Error ? error.message : "Firestore write failed";
@@ -611,6 +704,5 @@ observer.observe(document.documentElement, { childList: true, subtree: true });
 
 window.addEventListener("hashchange", runInitialScan);
 window.addEventListener("popstate", runInitialScan);
-window.addEventListener("nostr-profile-scraper-ready", runInitialScan);
 
 runInitialScan();
